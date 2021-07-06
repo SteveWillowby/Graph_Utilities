@@ -560,7 +560,7 @@ class NautyTracesSession:
                               stdout=subprocess.PIPE,
                               stderr=subprocess.DEVNULL)
         res = proc.stdout.decode()
-        # print(res)
+        print(res)
         lines = res.strip().split("\n")
         for line_idx in range(0, len(lines)):
             l = lines[line_idx].strip().split(" ")
@@ -650,7 +650,11 @@ class NautyTracesSession:
 
             elif current_result_type == self.CANONICAL_ORDER:
                 line_idx = last_header_line_idx + 2
-                idxs = [int(s) for s in lines[line_idx]]
+                idxs = []
+                while ':' not in lines[line_idx]:
+                    idxs += [int(s) for s in lines[line_idx]]
+                    line_idx += 1
+
                 filtered_idxs = []
                 for idx in idxs:
                     if idx in node_indices_at_time:
@@ -662,8 +666,11 @@ class NautyTracesSession:
                 got_canonical_order = True
 
             elif current_result_type == self.AUTOMORPHISM_ORBITS:
-                line_start_idx = last_header_line_idx + 2 + \
-                    int(got_canonical_order) * (self.max_num_nodes + 1)
+                line_start_idx = last_header_line_idx + 2
+                if got_canonical_order:
+                    while ':' not in lines[line_start_idx]:
+                        line_start_idx += 1
+                    line_start_idx += self.max_num_nodes
 
                 line_end_idx = line_start_idx + 1
                 while line_end_idx < len(lines) and \
@@ -770,27 +777,30 @@ if __name__ == "__main__":
     num_aut_1 = session.get_num_automorphisms()
     orbits_1 = session.get_automorphism_orbits()
     node_order_1 = session.get_canonical_order()
+    session.delete_edge("Sue", "Beth")
     session.add_node("Ben")
     session.add_edge("Ben", "Sue")
     num_aut_2 = session.get_num_automorphisms()
     orbits_2 = session.get_automorphism_orbits()
+    node_order_2 = session.get_canonical_order()
     session.complete()
     print(num_aut_1.get())
     print(orbits_1.get())
     print(node_order_1.get())
     print(num_aut_2.get())
     print(orbits_2.get())
+    print(node_order_2.get())
 
     print("\nNow for some strongly regular graphs")
 
     from test_graphs.some_srgs import *
     A1 = graph_from_srg_string(GRAPH_STRING_A1)
     A2 = graph_from_srg_string(GRAPH_STRING_A2)
-    session = NautyTracesSession(A2, mode="Nauty", sparse=False)
+    session = NautyTracesSession(A1, mode="Nauty", sparse=False)
     num_aut_1 = session.get_num_automorphisms()
     orbits_1 = session.get_automorphism_orbits()
     node_order_1 = session.get_canonical_order()
     session.complete()
     print(num_aut_1.get())
     print(orbits_1.get())
-    # print(node_order_1.get())  # TODO: fix bugs with node order.
+    print(node_order_1.get())  # TODO: fix bugs with node order.
