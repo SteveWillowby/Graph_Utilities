@@ -140,7 +140,7 @@ class NautyTracesSession:
 
         edges = [(a, b) for (a, b) in start_graph.edges()]
         if self.directed:
-            self.out_neigbors = {n : set() for n in self.nodes}
+            self.out_neighbors = {n : set() for n in self.nodes}
             self.in_neighbors = {n : set() for n in self.nodes}
             for (s, t) in edges:
                 self.out_neighbors[s].add(t)
@@ -405,7 +405,7 @@ class NautyTracesSession:
         partition_string = "f=["
         for i in range(0, len(partition_strings)):
             partition_string += partition_strings[i]
-            if i < len(partition_strings):
+            if i < len(partition_strings) - 1:
                 partition_string += "|"
         partition_string += "]"
         return partition_string
@@ -454,7 +454,7 @@ class NautyTracesSession:
     def set_colors_by_highlights(self, lists_of_nodes):
         self.__doing_coloring__()
 
-        nodes_in_list = lists_of_nodes[0]
+        nodes_in_list = list(lists_of_nodes[0])
         for i in range(1, len(lists_of_nodes)):
             nodes_in_list += lists_of_nodes[i]
         relevant_nodes = set(nodes_in_list)
@@ -462,8 +462,10 @@ class NautyTracesSession:
         if len(nodes_in_list) != len(relevant_nodes):
             raise ValueError("Error! Cannot give a node two different colors!")
 
+        index_lists = \
+            [[self.node_to_idx_map[n] for n in l] for l in lists_of_nodes]
         partition_string = \
-            self.__partition_string_for_lists_of_indices__(lists_of_nodes)
+            self.__partition_string_for_lists_of_indices__(index_lists)
         self.session_lines.append(partition_string)
 
         self.colored_nodes = relevant_nodes
@@ -596,8 +598,8 @@ class NautyTracesSession:
                     header_idx += 1
                     last_header_line_idx = line_idx
                     num_orbits = int(lines[line_idx][0])
-                    # TODO: Assure that the int does not overflow!
-                    num_automorphisms = int(lines[line_idx][2][8:-1])
+                    # TODO: Assure that the float does not overflow!
+                    num_automorphisms = float(lines[line_idx][2][8:-1])
 
                     node_indices_at_time = set([i for n, i in \
                             self.node_to_idx_maps[target_run].items()])
@@ -613,11 +615,11 @@ class NautyTracesSession:
                         total_uncolored_singletons = num_extra_nodes + \
                            num_uncolored_singleton_nodes_at_time
                         d_factor = total_uncolored_singletons
-                        divisor = 1
+                        divisor = 1.0
                         for _ in range(0, num_extra_nodes):
                             divisor *= d_factor
                             d_factor -= 1
-                        num_automorphisms = int(num_automorphisms / divisor)
+                        num_automorphisms = num_automorphisms / divisor
 
                     got_canonical_order = False
 
@@ -736,7 +738,7 @@ class NautyTracesSession:
             node = self.start_nodes_list[node_idx]
 
             if self.directed:
-                neighbors = list(self.start_graph.out_neighbors(node))
+                neighbors = list(self.start_graph.successors(node))
             else:
                 full_neighbors = list(self.start_graph.neighbors(node))
                 neighbors = []
