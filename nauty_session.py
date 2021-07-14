@@ -103,7 +103,7 @@ from os import remove
 
 class NautyTracesSession:
 
-    def __init__(self, start_graph, mode="Traces", sparse=True, \
+    def __init__(self, start_graph, mode="Nauty", sparse=True, \
                     tmp_path="/tmp/dreadnaut.txt", \
                     dreadnaut_call="Nauty_n_Traces/nauty26r12/dreadnaut"):
 
@@ -147,7 +147,8 @@ class NautyTracesSession:
                 self.in_neighbors[t].add(s)
         else:
             self.neighbors = {n : set() for n in self.nodes}
-            edges = [(min(a, b), max(a, b)) for (a, b) in edges]
+            edges = [(self.__node_min__(a, b), self.__node_max__(a, b)) \
+                            for (a, b) in edges]
             for (a, b) in edges:
                 self.neighbors[a].add(b)
                 self.neighbors[b].add(a)
@@ -172,6 +173,9 @@ class NautyTracesSession:
         self.can_edit = False
 
         if mode == "Traces":
+            if self.directed:
+                print("Warning! Running Traces with a directed graph --" + \
+                        " sometimes Traces segfaults on directed graphs.")
             self.session_init_lines.append("At")
         elif mode == "Nauty":
             if sparse:
@@ -227,6 +231,41 @@ class NautyTracesSession:
         self.coloring = False
 
         self.everything_complete = False
+
+    # Allow distinct nodes types with min and max functions:
+    def __node_comp__(self, a, b):
+        if (type(a) is tuple and type(b) is tuple) or \
+                (type(a) is list and type(b) is list):
+            if len(a) < len(b):
+                return -1
+            elif len(a) > len(b):
+                return 1
+            else:
+                for i in range(0, len(a)):
+                    r = self.__node_comp__(a[i], b[i])
+                    if r != 0:
+                        return r
+                return 0
+        elif type(a) is type(b):
+            if a < b:
+                return -1
+            elif a > b:
+                return 1
+            else:
+                0
+
+        # Otherwise, just compare typenames.
+        return str(type(a)) < str(type(b))
+
+    def __node_min__(self, a, b):
+        if self.__node_comp__(a, b) <= 0:
+            return a
+        return b
+
+    def __node_max__(self, a, b):
+        if self.__node_comp__(a, b) >= 0:
+            return b
+        return a
 
     # Graph Editing
 
@@ -562,7 +601,7 @@ class NautyTracesSession:
                               stdout=subprocess.PIPE,
                               stderr=subprocess.DEVNULL)
         res = proc.stdout.decode()
-        print(res)
+        # print(res)
         lines = res.strip().split("\n")
         for line_idx in range(0, len(lines)):
             l = lines[line_idx].strip().split(" ")
@@ -738,6 +777,7 @@ class NautyTracesSession:
             node = self.start_nodes_list[node_idx]
 
             if self.directed:
+                # successors means neighbors this node points to
                 neighbors = list(self.start_graph.successors(node))
             else:
                 full_neighbors = list(self.start_graph.neighbors(node))
@@ -792,17 +832,3 @@ if __name__ == "__main__":
     print(num_aut_2.get())
     print(orbits_2.get())
     print(node_order_2.get())
-
-    print("\nNow for some strongly regular graphs")
-
-    from test_graphs.some_srgs import *
-    A1 = graph_from_srg_string(GRAPH_STRING_A1)
-    A2 = graph_from_srg_string(GRAPH_STRING_A2)
-    session = NautyTracesSession(A1, mode="Nauty", sparse=False)
-    num_aut_1 = session.get_num_automorphisms()
-    orbits_1 = session.get_automorphism_orbits()
-    node_order_1 = session.get_canonical_order()
-    session.complete()
-    print(num_aut_1.get())
-    print(orbits_1.get())
-    print(node_order_1.get())  # TODO: fix bugs with node order.
