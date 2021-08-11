@@ -105,7 +105,7 @@ from os import getpid, remove
 class NautyTracesSession:
 
     def __init__(self, start_graph, mode="Nauty", sparse=True, \
-                    tmp_path="/tmp/%d_dreadnaut.txt" % os.getpid(), \
+                    tmp_path="/tmp/%d_dreadnaut.txt" % getpid(), \
                     dreadnaut_call="Nauty_n_Traces/nauty26r12/dreadnaut"):
 
         # start_nodes_list gets used in the original graph write to make sure
