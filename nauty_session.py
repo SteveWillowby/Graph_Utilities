@@ -18,10 +18,10 @@ from os import getpid, remove
 # Assumes `start_graph` is a networkx graph, or a graph class which supports
 #   the following methods:
 #       nodes()
-#       edges()
 #       is_directed()
-#       neighbors(node) -- if is_directed() returns false
-#       out_neighbors(node) -- if is_directed() returns true
+#       neighbors(node) -- required if is_directed() returns false
+#       successors(node) -- required if is_directed() returns true
+#       predecessors(node) -- required if is_directed() returns true
 #
 # `start_graph` is not modified during the run of the session; rather, the
 #   class COPIES `start_graph`
@@ -98,15 +98,24 @@ from os import getpid, remove
 #
 # get_num_automorphisms()
 #
-# get_num_automorphism_orbits(self):
+# get_num_automorphism_orbits()
 #
 # complete()
 
 class NautyTracesSession:
 
     def __init__(self, start_graph, mode="Nauty", sparse=True, \
+                    allow_edits=False, \
                     tmp_path="/tmp/%d_dreadnaut.txt" % getpid(), \
                     dreadnaut_call="Nauty_n_Traces/nauty26r12/dreadnaut"):
+
+        if allow_edits and sparse:
+            raise ValueError("Error! Can only edit the Nauty/Traces" + \
+                             " graph mid-session in dense mode.")
+        elif allow_edits and mode != "Nauty":
+            raise ValueError("Error! Can only edit the Nauty/Traces" + \
+                             " graph with mode='Nauty'.")
+        self.allow_edits = allow_edits
 
         # start_nodes_list gets used in the original graph write to make sure
         #   that the node order there matches the node order used throughout the
@@ -139,28 +148,36 @@ class NautyTracesSession:
         self.directed = start_graph.is_directed()
         self.start_graph = start_graph
 
-        edges = [(a, b) for (a, b) in start_graph.edges()]
-        if self.directed:
-            self.out_neighbors = {n : set() for n in self.nodes}
-            self.in_neighbors = {n : set() for n in self.nodes}
-            for (s, t) in edges:
-                self.out_neighbors[s].add(t)
-                self.in_neighbors[t].add(s)
-        else:
-            self.neighbors = {n : set() for n in self.nodes}
-            edges = [(self.__node_min__(a, b), self.__node_max__(a, b)) \
-                            for (a, b) in edges]
-            for (a, b) in edges:
-                self.neighbors[a].add(b)
-                self.neighbors[b].add(a)
+        if allow_edits:
+            if self.directed:
+                self.out_neighbors = \
+                    {n : set(start_graph.successors(n)) for n in self.nodes}
+                self.in_neighbors = \
+                    {n : set(start_graph.predecessors(n)) for n in self.nodes}
+            else:
+                self.neighbors = \
+                    {n : set(start_graph.neighbors(n)) for n in self.nodes}
 
         self.singleton_nodes = set()
         for n in self.nodes:
             if self.directed:
-                if len(self.out_neighbors[n]) + len(self.in_neighbors[n]) == 0:
+                # Coded this way to avoid copying the edges
+                singleton = True
+                for node in start_graph.predecessors(n):
+                    singleton = False
+                    break
+                for node in start_graph.successors(n):
+                    singleton = False
+                    break
+                if singleton:
                     self.singleton_nodes.add(n)
             else:
-                if len(self.neighbors[n]) == 0:
+                # Coded this way to avoid copying the edges
+                singleton = True
+                for node in start_graph.neighbors(n):
+                    singleton = False
+                    break
+                if singleton:
                     self.singleton_nodes.add(n)
 
         self.colored_nodes = set()
@@ -170,8 +187,6 @@ class NautyTracesSession:
 
         # session_init_lines will be used to feed into 
         self.session_init_lines = []
-
-        self.can_edit = False
 
         if mode == "Traces":
             if self.directed:
@@ -183,7 +198,6 @@ class NautyTracesSession:
                 self.session_init_lines.append("As")
             else:
                 self.session_init_lines.append("An")
-                self.can_edit = True
         else:
             raise ValueError(("Error! Unknown mode '%s' - " % mode) + \
                               "Input 'Nauty' or 'Traces'")
@@ -233,6 +247,7 @@ class NautyTracesSession:
 
         self.everything_complete = False
 
+
     # Allow distinct nodes types with min and max functions:
     def __node_comp__(self, a, b):
         if (type(a) is tuple and type(b) is tuple) or \
@@ -271,9 +286,10 @@ class NautyTracesSession:
     # Graph Editing
 
     def __doing_edit__(self):
-        if not self.can_edit:
+        if not self.allow_edits:
             raise RuntimeError("Error! Can only edit the graph mid-session " + \
-                    "when running with mode='Nauty' and sparse=False.")
+                    "when running with mode='Nauty', sparse=False," + \
+                    " and allow_edits=True.")
         if self.everything_complete:
             raise RuntimeError("Error! Cannot perform an edit to the graph " + \
                     "after session is complete.")
@@ -596,13 +612,13 @@ class NautyTracesSession:
 
         with open(self.tmp_path, 'w') as f:
             print("\n".join(all_lines), file=f)
+
         # call dreadnaut
         proc = subprocess.run([self.dreadnaut_call],
                               input=b"< " + self.tmp_path.encode(),
                               stdout=subprocess.PIPE,
                               stderr=subprocess.DEVNULL)
         res = proc.stdout.decode()
-        # print(res)
         lines = res.strip().split("\n")
         for line_idx in range(0, len(lines)):
             l = lines[line_idx].strip().split(" ")
@@ -615,6 +631,7 @@ class NautyTracesSession:
         self.__populate_results_from_lines__(lines)
 
         self.everything_complete = True
+
 
         # Clean up temporary file
         remove(self.tmp_path)
@@ -816,7 +833,7 @@ if __name__ == "__main__":
     start_graph.add_node("Beth")
     start_graph.add_node("Sue")
     start_graph.add_edge("Beth", "Sue")
-    session = NautyTracesSession(start_graph, mode="Nauty", sparse=False)
+    session = NautyTracesSession(start_graph, mode="Nauty", sparse=False, allow_edits=True)
     num_aut_1 = session.get_num_automorphisms()
     orbits_1 = session.get_automorphism_orbits()
     node_order_1 = session.get_canonical_order()
@@ -833,3 +850,12 @@ if __name__ == "__main__":
     print(num_aut_2.get())
     print(orbits_2.get())
     print(node_order_2.get())
+
+    from test_graphs.k_hop_graphs import k2_graph, k3_graph, k4_graph
+    G = k4_graph()
+    session = NautyTracesSession(G, mode="Traces")
+    # orbits = session.get_automorphism_orbits()
+    canon_order = session.get_canonical_order()
+    session.complete()
+    # print(orbits.get())
+    print(canon_order.get())
