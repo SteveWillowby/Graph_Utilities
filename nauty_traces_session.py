@@ -487,6 +487,7 @@ class NautyTracesSession:
                 partitions.append(p)
                 p = []
             p.append(i)
+            last_color = c
         partitions.append(p)
 
         partition_string = \
@@ -851,14 +852,3 @@ if __name__ == "__main__":
     print(num_aut_2.get())
     print(orbits_2.get())
     print(node_order_2.get())
-
-    from test_graphs.k_hop_graphs import k2_graph, k3_graph, k4_graph
-    G = k4_graph()
-    print("Running on a graph with %d nodes and %d edges..." % \
-            (len([n for n in G.nodes()]), len([e for e in G.edges()])))
-    session = NautyTracesSession(G, mode="Traces")
-    # orbits = session.get_automorphism_orbits()
-    canon_order = session.get_canonical_order()
-    session.complete()
-    # print(orbits.get())
-    print(canon_order.get())
