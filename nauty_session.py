@@ -620,6 +620,7 @@ class NautyTracesSession:
                               stderr=subprocess.DEVNULL)
         res = proc.stdout.decode()
         lines = res.strip().split("\n")
+
         for line_idx in range(0, len(lines)):
             l = lines[line_idx].strip().split(" ")
             new_line = []
@@ -734,7 +735,7 @@ class NautyTracesSession:
                 line_end_idx = line_start_idx + 1
                 while line_end_idx < len(lines) and \
                         ((lines[line_end_idx][0][0] in \
-                            ['0','1','2','3','4','5','6','7,','8','9']) or (\
+                            ['0','1','2','3','4','5','6','7','8','9']) or (\
                           lines[line_end_idx][0][-2:] == ");")) and \
                         'orbits;' not in lines[line_end_idx]:
                     line_end_idx += 1
@@ -853,6 +854,8 @@ if __name__ == "__main__":
 
     from test_graphs.k_hop_graphs import k2_graph, k3_graph, k4_graph
     G = k4_graph()
+    print("Running on a graph with %d nodes and %d edges..." % \
+            (len([n for n in G.nodes()]), len([e for e in G.edges()])))
     session = NautyTracesSession(G, mode="Traces")
     # orbits = session.get_automorphism_orbits()
     canon_order = session.get_canonical_order()
