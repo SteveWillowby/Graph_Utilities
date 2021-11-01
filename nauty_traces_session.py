@@ -1,6 +1,7 @@
 import bigfloat  # TODO: Move away from bigfloat.
-import subprocess
 from os import getpid, remove
+import subprocess
+import time
 
 # This file contains the class NautyTracesSession, a class designed
 #   to allow runs of nauty/traces that do not require continually
@@ -615,10 +616,12 @@ class NautyTracesSession:
             print("\n".join(all_lines), file=f)
 
         # call dreadnaut
+        start_t = time.time()
         proc = subprocess.run([self.dreadnaut_call],
                               input=b"< " + self.tmp_path.encode(),
                               stdout=subprocess.PIPE,
                               stderr=subprocess.DEVNULL)
+        total_t = time.time() - start_t
         res = proc.stdout.decode()
         lines = res.strip().split("\n")
 
@@ -630,7 +633,7 @@ class NautyTracesSession:
                     new_line.append(v)
             lines[line_idx] = l
 
-        self.__populate_results_from_lines__(lines)
+        self.__populate_results_from_lines__(lines, total_t)
 
         self.everything_complete = True
 
@@ -638,7 +641,7 @@ class NautyTracesSession:
         # Clean up temporary file
         remove(self.tmp_path)
 
-    def __populate_results_from_lines__(self, lines):
+    def __populate_results_from_lines__(self, lines, total_t):
         current_result = 0
         total_num_results = len(self.result_list)
         header_idx = -1
@@ -701,12 +704,24 @@ class NautyTracesSession:
                 time_idx = 0
                 while lines[line_idx][time_idx] != "time":
                     time_idx += 1
-                time_idx += 1  # skip the = sign
+                time_idx += 2  # skip the "time" and the "=" sign
 
-                res_str = ""
+                res_str = "Nauty/Traces: ' cpu time = "
                 while time_idx < len(lines[line_idx]):
                     res_str += lines[line_idx][time_idx] + " "
                     time_idx += 1
+
+                # That was Nauty/Traces estimate. Our timing of running
+                #   the subprocess is a bit longer:
+                # (i.e.) subprocess-run("./dreadnaut < prepared_input.txt")
+                our_hours = int(int(total_t) / 3600)
+                our_remainder = int(total_t) - our_hours * 3600
+                our_minutes = int(our_remainder / 60)
+                our_seconds = our_remainder - our_minutes * 60
+
+                res_str += "' | Our Subproces Call: %d:%d:%d" % \
+                            (our_hours, our_minutes, our_seconds)
+
                 current_result_value.__set_result__(res_str)
 
             elif current_result_type == self.CANONICAL_ORDER:
@@ -731,7 +746,10 @@ class NautyTracesSession:
                 if got_canonical_order:
                     while ':' not in lines[line_start_idx]:
                         line_start_idx += 1
-                    line_start_idx += self.max_num_nodes
+                    for _ in range(0, self.max_num_nodes):
+                        while ';' not in lines[line_start_idx][-1]:
+                            line_start_idx += 1
+                        line_start_idx += 1
 
                 line_end_idx = line_start_idx + 1
                 while line_end_idx < len(lines) and \
@@ -749,6 +767,7 @@ class NautyTracesSession:
 
                 orbits = []
                 big_line_idx = 0
+                # print(one_big_line)
                 while big_line_idx < len(one_big_line):
                     orbit = []
                     last_value = False
