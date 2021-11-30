@@ -1,6 +1,9 @@
 import os
 import time
 
+# TODO: Add security checks to ensure that the given filepath really is a
+#   filepath.
+
 # This file contains the class RAMFriendlyNTSession
 #
 # NOTE: Requires that the nodes are numbered 0 through |V| - 1.
