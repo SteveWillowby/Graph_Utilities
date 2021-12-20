@@ -133,6 +133,10 @@ class RAMFriendlyNTSession:
             tmp_path_base = tmp_path_base + "/"
         tmp_path_base = tmp_path_base + ("dreadnaut_%d" % os.getpid())
 
+        if announce_launch:
+            print("PID is %d" % os.getpid())
+            sys.stdout.flush()
+
         self.__n__ = len(neighbors_collections)
 
         # Number of extra nodes used to express things like edge types and
@@ -877,6 +881,23 @@ class RAMFriendlyNTSession:
             # Cases 1, 2, and 4 -- no extra nodes
             pass
 
+        total_n = self.__n__ + self.__extra_n__
+        if total_n > 2000000000:
+            self.__input_file__.close()
+            if self.__only_one_call__:
+                os.remove(self.__input_filename__)
+            else:
+                os.remove(self.__intro_filename__)
+
+            if self.__dir_augment__ or self.__et_augment__:
+                self.__augment_file__.close()
+                os.remove(self.__augment_filename__)
+
+            raise ValueError(("Error! Nauty/Traces cannot handle graphs " + \
+                             "with over 2000000000 nodes. \nThis graph has " + \
+                "%d nodes plue %d nodes needed for augmenting: %d total." % \
+                             (self.__n__, self.__extra_n__, total_n)) + \
+                " Note that Traces often needs more augment nodes than Nauty.")
 
         self.__write__("n %d\n" % (self.__n__ + self.__extra_n__))
         self.__write__("g \n")
@@ -1040,7 +1061,14 @@ class RAMFriendlyNTSession:
                         continue
                     self.__write__("%d " % neighbor)
 
+        if self.__announce_launch__:
+            print("    Wrote edges.")
+            sys.stdout.flush()
+
         if self.__et_augment__ or self.__dir_augment__:
+            if self.__announce_launch__:
+                print("    Copying augment nodes and edges.")
+                sys.stdout.flush()
             # If we used the augment file, now append it to the main file.
             self.__augment_file__.close()
             self.__augment_file__ = open(self.__augment_filename__, "r")
@@ -1052,6 +1080,10 @@ class RAMFriendlyNTSession:
             os.remove(self.__augment_filename__)
 
         self.__write__(";\n")
+
+        if self.__announce_launch__:
+            print("    Killing py graph.")
+            sys.stdout.flush()
 
         if self.__kill_py_graph__:
             for _ in range(0, self.__n__):
@@ -1092,8 +1124,6 @@ if __name__ == "__main__":
                                  sparse=True)
 
     assert len(neighbors_collections) == 0
-
-    # TODO: Debug -- the Traces direction augmentation is failing.
 
     # rt_1 = session.get_runtime()
     # session.set_colors_by_partitions([[1], [2, 0, 3, 4]])
